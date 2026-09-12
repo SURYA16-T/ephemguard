@@ -4,26 +4,40 @@ EphemGuard is a cross-platform, user-space security gateway for AI-agent tool ca
 It applies defense-in-depth controls before a tool request can reach a downstream MCP/JSON-RPC server.
 
 ## About This Project
-EphemGuard acts as an invisible **security middleware** (or plugin wrapper) between your AI Client (Claude Desktop, Cursor, Local LLMs like Ollama) and the actual MCP server. It ensures that any command or file-system action requested by an AI agent is verified, sanitized, and authorized based on strict policies, providing a robust layer of protection for your local machine.
+
+EphemGuard operates as an invisible **security middleware** (or plugin wrapper) between your AI Client (Claude Desktop, Cursor, Local LLMs like Ollama) and the actual MCP server. Instead of configuring your AI client to launch the MCP server directly, you configure it to launch `ephemguard wrap`, which spins up the target server internally and filters the JSON-RPC traffic with all code checked to be safe, enhanced by security code and all aspects of it.
 
 ## Where to Use This Project
+
 - **Local AI Development:** Protect your personal files and operating system when running experimental AI agents locally (e.g., using Cursor or Claude Desktop).
 - **Automated Workflows:** Secure continuous integration or scripting environments that rely on LLM-driven actions.
 - **Enterprise Endpoint Security:** Add an extra layer of auditability and policy enforcement for employees using AI coding assistants.
 
-## How It Works
-EphemGuard spins up the target server internally and filters all JSON-RPC traffic. It implements several security controls:
-- JSON-RPC 2.0 request validation and semantic intent checks.
-- Workspace path confinement and symlink/junction-aware resolution.
-- Short-lived, single-use HMAC capability leases with replay protection.
-- SHA-256 MCP tool-schema pinning.
-- OS-aware command policies and tamper-evident hash-chain audit logs.
+## Security controls
+
+- JSON-RPC 2.0 request validation
+- Centralized policy checks
+- Workspace path confinement and symlink/junction-aware resolution
+- Short-lived, single-use HMAC capability leases
+- Replay protection
+- SHA-256 MCP tool-schema pinning
+- Lightweight semantic intent checks
+- OS-aware command policy for POSIX and PowerShell
+- Tamper-evident hash-chain audit logs
+- Security tests for traversal, injection, poisoning, replay, and capability escalation
+
+## Supported operating systems
+
+- macOS
+- Linux
+- Windows
 
 ## Supported Operating Systems & OS-Specific Commands
 
-EphemGuard comes with a built-in interactive diagnostics dashboard. Depending on your operating system, the dashboard securely authorizes specific diagnostic commands. 
+EphemGuard comes with a built-in interactive diagnostics dashboard. Depending on your operating system, the dashboard securely authorizes specific diagnostic commands.
 
 ### macOS
+
 - `sysinfo`: `sw_vers` (OS version)
 - `disk`: `df -h` (Disk usage)
 - `memory`: `vm_stat` (Virtual memory statistics)
@@ -34,6 +48,7 @@ EphemGuard comes with a built-in interactive diagnostics dashboard. Depending on
 - `users`: `who` (Logged in users)
 
 ### Linux
+
 - `sysinfo`: `uname -a` (Kernel information)
 - `disk`: `df -h` (Disk usage)
 - `memory`: `free -m` (Memory usage)
@@ -44,6 +59,7 @@ EphemGuard comes with a built-in interactive diagnostics dashboard. Depending on
 - `users`: `who` (Logged in users)
 
 ### Windows (PowerShell)
+
 - `sysinfo`: `systeminfo | Select-String 'OS Name','OS Version','System Type'` (System info)
 - `disk`: `Get-Volume | Select-Object DriveLetter, FileSystemLabel, Size, SizeRemaining` (Disk usage)
 - `memory`: `Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize, FreePhysicalMemory` (Memory usage)
