@@ -1,0 +1,4 @@
+allowed_tools:
+  - filesystem_read
+  - filesystem_write
+lease_ttl_seconds: 15

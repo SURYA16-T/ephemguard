@@ -1,0 +1,2 @@
+[console_scripts]
+ephemguard = ephemguard.cli:main

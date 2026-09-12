@@ -1,0 +1,11 @@
+PyYAML>=6.0
+bashlex>=0.18
+
+[dashboard]
+aiohttp>=3.9.0
+psutil>=5.9.0
+
+[test]
+pytest>=8.0
+aiohttp
+psutil

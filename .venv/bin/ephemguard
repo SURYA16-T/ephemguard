@@ -1,0 +1,6 @@
+#!/Users/suryaprakasht/Downloads/cyber/ephemguard/.venv/bin/python3
+import sys
+from ephemguard.cli import main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(main())

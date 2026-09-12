@@ -1,0 +1,5 @@
+os: macos
+allowed_tools:
+  - filesystem_read
+  - filesystem_write
+shell: posix

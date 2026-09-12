@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EphemGuard Security Dashboard</title>
+    <!-- Use standard fonts for premium look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --bg-panel: #161b22;
+            --bg-card: #21262d;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #2ea043;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --accent-orange: #d29922;
+            --border-color: #30363d;
+            
+            --term-linux: #39ff14;
+            --term-mac: #c9d1d9;
+            --term-win: #00a4ef;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            font-weight: 600;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-item {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: var(--bg-card);
+            border-left-color: var(--accent-blue);
+        }
+
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .header {
+            height: 60px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            background-color: var(--bg-panel);
+            flex-shrink: 0;
+        }
+
+        .system-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+
+        .system-badge.os-linux { color: var(--term-linux); border-color: rgba(57, 255, 20, 0.3); }
+        .system-badge.os-macos { color: var(--term-mac); border-color: rgba(201, 209, 217, 0.3); }
+        .system-badge.os-windows { color: var(--term-win); border-color: rgba(0, 164, 239, 0.3); }
+
+        .container {
+            padding: 24px;
+            display: none;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .container.active { display: flex; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+
+        /* Pending Requests */
+        .pending-list { display: flex; flex-direction: column; gap: 15px; }
+        .pending-item {
+            background-color: var(--bg-card);
+            border: 1px solid var(--accent-orange);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(210, 153, 34, 0.1);
+        }
+        .pending-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .action-btns button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .btn-approve { background-color: var(--accent-green); color: white; }
+        .btn-deny { background-color: var(--accent-red); color: white; }
+
+        /* Code display */
+        pre {
+            background-color: #0d1117;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            margin: 0;
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Terminal */
+        .terminal-container {
+            background-color: #000;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+        .terminal-header {
+            background-color: #1a1a1a;
+            padding: 8px 15px;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid #333;
+        }
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot-red { background-color: #ff5f56; }
+        .dot-yellow { background-color: #ffbd2e; }
+        .dot-green { background-color: #27c93f; }
+        
+        .terminal-body {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .term-prompt-linux { color: var(--term-linux); }
+        .term-prompt-macos { background: linear-gradient(90deg, #bc8cff, #58a6ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+        .term-prompt-windows { color: var(--term-win); }
+        
+        .term-output { color: #ddd; white-space: pre-wrap; margin-top: 5px;}
+        
+        .terminal-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background-color: #0a0c10;
+            border-top: 1px solid #222;
+        }
+        
+        .term-input {
+            flex-grow: 1;
+            background: transparent;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #58a6ff;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            padding: 7px 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .term-input:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+        }
+        
+        .terminal-controls {
+            padding: 12px 15px;
+            background-color: #111;
+            border-top: 1px solid #222;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .term-btn {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        .term-btn:hover { background-color: #30363d; border-color: #8b949e; color: #fff; }
+        .term-btn-primary { background-color: #238636; border-color: #2ea043; color: #fff; }
+        .term-btn-primary:hover { background-color: #2ea043; }
+        .term-btn-clear { background-color: #21262d; border-color: #f85149; color: #f85149; }
+        .term-btn-clear:hover { background-color: #f85149; color: #fff; }
+
+        /* Audit table */
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
+        tr:hover { background-color: rgba(255,255,255,0.02); }
+        
+        .badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .bg-green { background-color: rgba(46, 160, 67, 0.15); color: var(--accent-green); }
+        .bg-red { background-color: rgba(248, 81, 73, 0.15); color: var(--accent-red); }
+        .bg-blue { background-color: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+
+        .hash-cell { font-family: 'Fira Code', monospace; font-size: 0.75rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-blue)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <h1>EphemGuard</h1>
+        </div>
+        <div class="nav-item active" onclick="switchTab('overview')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            Overview
+        </div>
+        <div class="nav-item" onclick="switchTab('terminal')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            Terminal Diagnostics
+        </div>
+        <div class="nav-item" onclick="switchTab('approvals')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            Approvals <span id="pending-badge" class="badge bg-red" style="display:none; margin-left:auto;">0</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('audit')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Audit Trail
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h2 id="page-title" style="margin:0; font-size: 1.1rem; font-weight: 400;">System Overview</h2>
+            <div id="os-badge" class="system-badge">Connecting...</div>
+        </div>
+
+        <!-- OVERVIEW TAB -->
+        <div id="tab-overview" class="container active">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">System CPU</div>
+                    <div class="metric-value" id="metric-cpu">--%</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;" id="metric-cpu-cores">-- cores</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Memory Usage</div>
+                    <div class="metric-value" id="metric-mem">--%</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;" id="metric-mem-detail">-- / --</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Security Interceptions</div>
+                    <div class="metric-value" style="color: var(--accent-red)" id="metric-denied">0</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">Total Denied Requests</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">Platform Information</div>
+                <div class="table-wrapper">
+                    <table id="sysinfo-table">
+                        <tbody>
+                            <tr><td>Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TERMINAL TAB -->
+        <div id="tab-terminal" class="container">
+            <div class="terminal-container">
+                <div class="terminal-header">
+                    <div class="terminal-dot dot-red"></div>
+                    <div class="terminal-dot dot-yellow"></div>
+                    <div class="terminal-dot dot-green"></div>
+                    <div style="margin-left: 10px; font-size: 0.8rem; color: #888; font-family: sans-serif;">ephemguard@system ~ diagnostics</div>
+                    <div style="margin-left: auto; display: flex; gap: 8px;">
+                        <button class="term-btn term-btn-clear" onclick="clearTerminalOutput()" style="padding: 2px 8px; font-size: 0.75rem;">Clear Console</button>
+                        <button class="term-btn term-btn-primary" onclick="runAllDiagnostics()" style="padding: 2px 8px; font-size: 0.75rem;">Run All</button>
+                    </div>
+                </div>
+                <div class="terminal-body" id="term-output">
+                    <div><span style="color: #888">EphemGuard Diagnostics Console & Terminal Gateway</span></div>
+                    <div><span style="color: #888">OS Detected: </span><span id="term-os-name">--</span></div>
+                    <div><span style="color: #58a6ff;">Tip:</span> <span style="color: #888;">Type a command ID below or click any pre-approved button to execute securely.</span></div>
+                    <br>
+                </div>
+                <div class="terminal-input-row">
+                    <span id="term-input-prompt" class="term-prompt-macos" style="font-family: 'Fira Code', monospace; font-size: 0.85rem;">ephemguard %</span>
+                    <input type="text" id="term-cmd-input" class="term-input" placeholder="Type a diagnostic command (e.g. sysinfo, disk, memory, network)..." autocomplete="off" spellcheck="false" />
+                    <button id="term-run-btn" class="term-btn term-btn-primary" onclick="submitTerminalInput()">Run</button>
+                </div>
+                <div class="terminal-controls" id="term-controls">
+                    <!-- Buttons populated dynamically -->
+                    <span style="color: #888; font-size: 0.8rem;">Loading commands...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- APPROVALS TAB -->
+        <div id="tab-approvals" class="container">
+            <div class="card">
+                <div class="card-header">Human-in-the-Loop Pending Approvals</div>
+                <div id="pending-container" class="pending-list">
+                    <div style="padding: 20px; text-align: center; color: var(--text-muted);">No pending requests.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AUDIT TAB -->
+        <div id="tab-audit" class="container">
+            <div class="card">
+                <div class="card-header">Tamper-Evident Audit Log</div>
+                <div class="table-wrapper">
+                    <table id="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Client</th>
+                                <th>Event</th>
+                                <th>Tool</th>
+                                <th>Status/Reason</th>
+                                <th>Hash Chain</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentOS = "unknown";
+        let statsInterval = null;
+
+        // XSS Prevention: Safely create text nodes instead of innerHTML
+        function createEl(tag, text, className) {
+            const el = document.createElement(tag);
+            if (text) el.textContent = text;
+            if (className) el.className = className;
+            return el;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.container').forEach(el => el.classList.remove('active'));
+            
+            event.currentTarget.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            const titles = {
+                'overview': 'System Overview',
+                'terminal': 'Terminal Diagnostics',
+                'approvals': 'Pending Approvals',
+                'audit': 'Security Audit Trail'
+            };
+            document.getElementById('page-title').textContent = titles[tabId];
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // --- Data Fetching ---
+
+        async function fetchSystemInfo() {
+            try {
+                const res = await fetch('/api/system');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // Update Badge
+                currentOS = data.os;
+                const badge = document.getElementById('os-badge');
+                badge.textContent = `💻 ${data.platform || data.os}`;
+                badge.className = 'system-badge';
+                if (data.os === 'darwin') badge.classList.add('os-macos');
+                else if (data.os === 'win32') badge.classList.add('os-windows');
+                else badge.classList.add('os-linux');
+                
+                document.getElementById('term-os-name').textContent = data.platform || data.os;
+
+                // Update Overview Metrics
+                if (data.has_psutil) {
+                    document.getElementById('metric-cpu').textContent = `${data.cpu.usage_percent}%`;
+                    document.getElementById('metric-cpu-cores').textContent = `${data.cpu.physical_cores} cores (${data.cpu.total_cores} logical)`;
+                    
+                    document.getElementById('metric-mem').textContent = `${data.memory.usage_percent}%`;
+                    document.getElementById('metric-mem-detail').textContent = `${formatBytes(data.memory.used_bytes)} / ${formatBytes(data.memory.total_bytes)}`;
+                }
+
+                // Update Table
+                const tbody = document.createElement('tbody');
+                
+                const addRow = (key, val) => {
+                    const tr = document.createElement('tr');
+                    tr.appendChild(createEl('td', key, ''));
+                    tr.appendChild(createEl('td', val, ''));
+                    tbody.appendChild(tr);
+                };
+                
+                addRow('OS', data.os);
+                addRow('Platform', data.platform);
+                addRow('Architecture', data.architecture);
+                addRow('Python Version', data.python_version);
+                if (data.has_psutil) {
+                    addRow('Active Processes', data.processes);
+                    addRow('Network Sent', formatBytes(data.network.bytes_sent));
+                    addRow('Network Recv', formatBytes(data.network.bytes_recv));
+                }
+                
+                const table = document.getElementById('sysinfo-table');
+                table.innerHTML = '';
+                table.appendChild(tbody);
+                
+            } catch (e) {
+                console.error("Failed to fetch system info:", e);
+            }
+        }
+
+        let currentTerminalOs = 'macos';
+        let availableTerminalCommands = [];
+
+        async function fetchTerminalCommands() {
+            try {
+                const res = await fetch('/api/terminal/commands');
+                if (!res.ok) return;
+                const data = await res.json();
+                currentTerminalOs = data.os;
+                availableTerminalCommands = data.commands;
+                
+                // Update terminal prompt prefix and class
+                const promptSpan = document.getElementById('term-input-prompt');
+                if (promptSpan) {
+                    promptSpan.textContent = getPromptPrefix(data.os);
+                    promptSpan.className = getPromptClass(data.os);
+                }
+                const osLabel = document.getElementById('term-os-name');
+                if (osLabel) {
+                    osLabel.textContent = data.os.toUpperCase();
+                }
+                
+                const controls = document.getElementById('term-controls');
+                controls.innerHTML = ''; // clear loading
+                
+                data.commands.forEach(cmd => {
+                    const btn = document.createElement('button');
+                    btn.className = 'term-btn';
+                    btn.textContent = `${cmd.id} (${cmd.description})`;
+                    btn.title = cmd.command;
+                    btn.onclick = () => executeTerminalCommand(cmd.id, cmd.command, data.os);
+                    controls.appendChild(btn);
+                });
+            } catch (e) {
+                console.error("Failed to fetch terminal commands:", e);
+            }
+        }
+
+        function getPromptPrefix(os_type) {
+            if (os_type === 'macos') return 'ephemguard@mac % ';
+            if (os_type === 'windows') return 'PS C:\\> ';
+            return 'ephemguard@linux:~$ ';
+        }
+        
+        function getPromptClass(os_type) {
+            if (os_type === 'macos') return 'term-prompt-macos';
+            if (os_type === 'windows') return 'term-prompt-windows';
+            return 'term-prompt-linux';
+        }
+
+        function clearTerminalOutput() {
+            const out = document.getElementById('term-output');
+            out.innerHTML = `
+                <div><span style="color: #888">EphemGuard Diagnostics Console & Terminal Gateway</span></div>
+                <div><span style="color: #888">OS Detected: </span><span id="term-os-name">${currentTerminalOs.toUpperCase()}</span></div>
+                <div><span style="color: #58a6ff;">Tip:</span> <span style="color: #888;">Console cleared. Type a command or select a pre-approved diagnostic.</span></div>
+                <br>
+            `;
+        }
+
+        async function runAllDiagnostics() {
+            if (!availableTerminalCommands || availableTerminalCommands.length === 0) return;
+            for (const cmd of availableTerminalCommands) {
+                await executeTerminalCommand(cmd.id, cmd.command, currentTerminalOs);
+            }
+        }
+
+        function submitTerminalInput() {
+            const input = document.getElementById('term-cmd-input');
+            const val = input.value.trim();
+            if (!val) return;
+            input.value = '';
+
+            // Check if matches a known command ID or full command string
+            const found = availableTerminalCommands.find(c => 
+                c.id.toLowerCase() === val.toLowerCase() || 
+                c.command.toLowerCase() === val.toLowerCase()
+            );
+
+            if (found) {
+                executeTerminalCommand(found.id, found.command, currentTerminalOs);
+            } else {
+                // Execute or display policy block
+                executeTerminalCommand(val, val, currentTerminalOs);
+            }
+        }
+
+        // Handle Enter key in command input
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('term-cmd-input');
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        submitTerminalInput();
+                    }
+                });
+            }
+        });
+
+        async function executeTerminalCommand(id, cmdStr, osType) {
+            const out = document.getElementById('term-output');
+            
+            // Render Prompt
+            const promptDiv = document.createElement('div');
+            promptDiv.style.marginTop = '10px';
+            
+            const promptSpan = createEl('span', getPromptPrefix(osType), getPromptClass(osType));
+            const cmdSpan = createEl('span', cmdStr, '');
+            cmdSpan.style.color = '#fff';
+            cmdSpan.style.fontWeight = '600';
+            promptDiv.appendChild(promptSpan);
+            promptDiv.appendChild(cmdSpan);
+            out.appendChild(promptDiv);
+            out.scrollTop = out.scrollHeight;
+
+            try {
+                // CSRF mitigation via Fetch API (relies on Origin and Sec-Fetch-Site checks on backend)
+                const res = await fetch('/api/terminal/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                
+                const data = await res.json();
+                
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'term-output';
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<span style="color: #f85149; font-weight: 600;">[POLICY REJECTED]</span> ${data.error}`;
+                } else {
+                    const text = (data.stdout + '\n' + data.stderr).trim() || '(no output)';
+                    resultDiv.textContent = text;
+                    const durationStr = data.duration_ms ? `${data.duration_ms.toFixed(2)}ms` : '';
+                    const statusSpan = createEl('div', `[Exit code: ${data.returncode} | Executed in: ${durationStr}]`, '');
+                    statusSpan.style.color = data.returncode === 0 ? '#27c93f' : '#ffbd2e';
+                    statusSpan.style.fontSize = '0.75rem';
+                    statusSpan.style.marginTop = '4px';
+                    resultDiv.appendChild(statusSpan);
+                }
+                
+                out.appendChild(resultDiv);
+                
+            } catch (e) {
+                const errDiv = createEl('div', `Connection error: ${e.message}`, 'term-output');
+                errDiv.style.color = '#ff5f56';
+                out.appendChild(errDiv);
+            }
+            out.scrollTop = out.scrollHeight;
+        }
+
+        async function fetchPending() {
+            try {
+                const res = await fetch('/api/pending');
+                const data = await res.json();
+                
+                const container = document.getElementById("pending-container");
+                const badge = document.getElementById("pending-badge");
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No pending requests.</div>';
+                    badge.style.display = 'none';
+                    return;
+                }
+                
+                badge.textContent = data.length;
+                badge.style.display = 'inline-block';
+                container.innerHTML = '';
+                
+                data.forEach(req => {
+                    const item = document.createElement('div');
+                    item.className = 'pending-item';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'pending-header';
+                    
+                    const title = createEl('strong', `${req.client} wants to run ${req.request.params.name}`, '');
+                    
+                    const btns = document.createElement('div');
+                    btns.className = 'action-btns';
+                    
+                    const btnApprove = createEl('button', 'Approve', 'btn-approve');
+                    btnApprove.onclick = () => submitDecision(req.id, true);
+                    
+                    const btnDeny = createEl('button', 'Deny', 'btn-deny');
+                    btnDeny.onclick = () => submitDecision(req.id, false);
+                    
+                    btns.appendChild(btnDeny);
+                    btns.appendChild(btnApprove);
+                    
+                    header.appendChild(title);
+                    header.appendChild(btns);
+                    
+                    const code = document.createElement('pre');
+                    code.textContent = JSON.stringify(req.request.params.arguments, null, 2);
+                    
+                    item.appendChild(header);
+                    item.appendChild(code);
+                    container.appendChild(item);
+                });
+            } catch (e) {
+                console.error("Failed to fetch pending requests", e);
+            }
+        }
+
+        async function submitDecision(id, approved) {
+            try {
+                await fetch('/api/decide', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, approved })
+                });
+                fetchPending(); // refresh immediately
+            } catch (e) {
+                alert("Failed to submit decision");
+            }
+        }
+
+        async function fetchAudit() {
+            try {
+                const res = await fetch('/api/audit?limit=50');
+                const logs = await res.json();
+                
+                const tbody = document.createElement('tbody');
+                let deniedCount = 0;
+                
+                if (logs.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = 6;
+                    td.textContent = "No audit logs found.";
+                    td.style.textAlign = "center";
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                } else {
+                    logs.forEach(log => {
+                        if (log.event === 'ToolCallDenied') deniedCount++;
+                        
+                        const tr = document.createElement('tr');
+                        
+                        // Time
+                        const d = new Date(log.ts * 1000);
+                        tr.appendChild(createEl('td', d.toLocaleTimeString(), ''));
+                        
+                        // Client
+                        tr.appendChild(createEl('td', log.client || 'unknown', ''));
+                        
+                        // Event Badge
+                        const tdEvent = document.createElement('td');
+                        const isAllowed = log.event === 'ToolCallAllowed';
+                        tdEvent.appendChild(createEl('span', isAllowed ? 'ALLOWED' : 'DENIED', `badge ${isAllowed ? 'bg-green' : 'bg-red'}`));
+                        tr.appendChild(tdEvent);
+                        
+                        // Tool
+                        const tdTool = document.createElement('td');
+                        tdTool.appendChild(createEl('span', log.tool || '-', 'badge bg-blue'));
+                        tr.appendChild(tdTool);
+                        
+                        // Reason
+                        tr.appendChild(createEl('td', log.reason || '-', ''));
+                        
+                        // Hash Chain
+                        const hashCell = document.createElement('td');
+                        hashCell.className = 'hash-cell';
+                        const truncHash = log.hash ? log.hash.substring(0, 16) + '...' : '-';
+                        hashCell.title = `Hash: ${log.hash}\nPrev: ${log.prev_hash}`;
+                        hashCell.textContent = truncHash;
+                        tr.appendChild(hashCell);
+                        
+                        tbody.appendChild(tr);
+                    });
+                }
+                
+                const table = document.getElementById('audit-table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Client</th>
+                            <th>Event</th>
+                            <th>Tool</th>
+                            <th>Status/Reason</th>
+                            <th>Hash Chain</th>
+                        </tr>
+                    </thead>
+                `;
+                table.appendChild(tbody);
+                
+                // Update dashboard metric
+                document.getElementById('metric-denied').textContent = deniedCount;
+                
+            } catch (e) {
+                console.error("Failed to fetch audit log", e);
+            }
+        }
+
+        // Initialization
+        async function init() {
+            await fetchSystemInfo();
+            await fetchTerminalCommands();
+            
+            // Initial fetches
+            fetchPending();
+            fetchAudit();
+            
+            // Setup polling
+            setInterval(() => {
+                fetchSystemInfo();
+                fetchPending();
+                fetchAudit();
+            }, 2000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
