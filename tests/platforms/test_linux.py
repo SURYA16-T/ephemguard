@@ -38,3 +38,6 @@ def test_linux_path_confinement(tmp_path):
     with pytest.raises(PathTraversalError):
         jailer.check_path("/etc/passwd")
 
+def test_linux_safe():
+    validate_command("ls -la")
+

@@ -46,3 +46,6 @@ def test_windows_path_confinement(tmp_path, monkeypatch):
         with pytest.raises(PathTraversalError):
             jailer.check_path(unc_path)
 
+def test_windows_safe():
+    validate_command("Get-ChildItem")
+

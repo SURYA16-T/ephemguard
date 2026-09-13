@@ -46,3 +46,10 @@ def test_null_byte_injection(jail_env):
         jailer.check_path(allowed / payload)
     except (ValueError, PathTraversalError):
         pass # Blocked or rejected
+
+def test_path_escape(tmp_path):
+    from ephemguard.security.attenuator import attenuate_tool_call, CapabilityViolation
+    from ephemguard.security.policy_engine import PolicyEngine
+    with pytest.raises(CapabilityViolation):
+        attenuate_tool_call("filesystem_read", {"path": "../../etc/passwd"}, str(tmp_path), PolicyEngine())
+

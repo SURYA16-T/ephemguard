@@ -9,9 +9,43 @@ from pathlib import Path
 from ephemguard.proxy.server import StdioBridge
 
 
+def _load_or_create_secret(path: str) -> bytes:
+    import secrets
+    target = Path(path).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        secret = target.read_bytes()
+        if len(secret) < 32:
+            raise ValueError("secret file must contain at least 32 bytes")
+        return secret
+    secret = secrets.token_bytes(32)
+    target.write_bytes(secret)
+    try:
+        os.chmod(target, 0o600)
+    except OSError:
+        pass
+    return secret
+
+
 def main():
-    parser = argparse.ArgumentParser(description="EphemGuard: AI Agent Security Gateway")
+    parser = argparse.ArgumentParser(prog="ephemguard", description="EphemGuard: AI Agent Security Gateway")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    # Platform Command
+    subparsers.add_parser("platform", help="Print detected platform name (macos, linux, windows)")
+
+    # Check-Path Command
+    cp_parser = subparsers.add_parser("check-path", help="Validate that a path is confined to a workspace")
+    cp_parser.add_argument("--workspace", required=True, help="Allowed workspace directory")
+    cp_parser.add_argument("--path", required=True, help="Target candidate path to validate")
+
+    # Make-Lease Command
+    ml_parser = subparsers.add_parser("make-lease", help="Mint a signed ephemeral capability lease")
+    ml_parser.add_argument("--secret-file", required=True, help="Path to secret file")
+    ml_parser.add_argument("--tool", required=True, help="Tool name to authorize")
+    ml_parser.add_argument("--resource", default="", help="Resource path or URI bound to this lease")
+    ml_parser.add_argument("--operation", default="read", help="Allowed operation (read, write, etc.)")
+    ml_parser.add_argument("--ttl", type=int, default=15, help="Time to live in seconds")
 
     # Proxy / Wrap Command
     proxy_parser = subparsers.add_parser("proxy", aliases=["wrap"], help="Run the security proxy (alias: wrap)")
@@ -19,8 +53,9 @@ def main():
     help="Operation mode (interactive requires HITL approval)")
     proxy_parser.add_argument("--workspace", default=os.getcwd(), help="Allowed workspace path")
     proxy_parser.add_argument("--client-name", default="Unknown Agent", help="Name of the AI client for audit logging")
-    proxy_parser.add_argument("--secret-file", help="Path to file for persistent HMAC secret")
+    proxy_parser.add_argument("--secret-file", default=".ephemguard.secret", help="Path to file for persistent HMAC secret")
     proxy_parser.add_argument("--log-dir", help="Directory for audit and IPC logs")
+    proxy_parser.add_argument("--log", default="logs/audit.jsonl", help="Path to audit log file")
     proxy_parser.add_argument("upstream", nargs=argparse.REMAINDER, help="Upstream MCP server command")
 
     # Dashboard Command
@@ -40,7 +75,23 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command in ("proxy", "wrap"):
+    if args.command == "platform":
+        from ephemguard.platform.detector import current_os
+        print(current_os())
+        return
+
+    elif args.command == "check-path":
+        from ephemguard.security.path_guard import resolve_confined
+        print(resolve_confined(args.workspace, args.path))
+        return
+
+    elif args.command == "make-lease":
+        from ephemguard.security.lease_manager import LeaseManager
+        secret = _load_or_create_secret(args.secret_file)
+        print(LeaseManager(secret).mint(args.tool, args.resource, args.operation, args.ttl))
+        return
+
+    elif args.command in ("proxy", "wrap"):
         if not args.upstream:
             print("Error: Upstream command required.", file=sys.stderr)
             sys.exit(1)
@@ -96,19 +147,10 @@ def main():
             sys.exit(1)
             
     elif args.command == "audit-verify":
-        from ephemguard.security.integrity import verify_chain
-        
-        path = args.file
-        if not os.path.exists(path):
-            print(f"Audit log not found at {path}")
-            sys.exit(1)
-            
-        if verify_chain(path):
-            print(f"✅ PASS: Cryptographic chain verified for {path}")
-            sys.exit(0)
-        else:
-            print(f"❌ FAIL: Audit log at {path} has been tampered with or is corrupted!")
-            sys.exit(1)
+        from ephemguard.audit.integrity import verify_chain
+        passed = verify_chain(args.file)
+        print("PASS" if passed else "FAIL")
+        raise SystemExit(0 if passed else 1)
 
     else:
         parser.print_help()

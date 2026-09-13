@@ -31,3 +31,14 @@ def test_windows_command_injection_payloads():
     for payload in payloads:
         with pytest.raises(CommandInjectionError):
             guard.check_command(payload)
+
+def test_posix_chain():
+    from ephemguard.security.command_guard import inspect_posix, CommandViolation
+    with pytest.raises(CommandViolation):
+        inspect_posix("echo safe && whoami")
+
+def test_powershell_risky_primitive():
+    from ephemguard.security.command_guard import inspect_powershell, CommandViolation
+    with pytest.raises(CommandViolation):
+        inspect_powershell("Invoke-Expression $x")
+

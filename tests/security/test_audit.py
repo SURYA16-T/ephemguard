@@ -40,3 +40,10 @@ def test_audit_logger_tamper_detection(tmp_path):
     
     # The chain validation should now fail
     assert verify_chain(str(log_file)) is False
+
+def test_audit_chain_survives_restart(tmp_path):
+    from ephemguard.audit import AuditLogger as TopAuditLogger, verify_chain as top_verify_chain
+    path = tmp_path / "audit.jsonl"
+    TopAuditLogger(str(path)).record("One")
+    TopAuditLogger(str(path)).record("Two")
+    assert top_verify_chain(str(path))

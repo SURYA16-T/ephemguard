@@ -23,3 +23,11 @@ def test_capability_escalation():
     # Invalid attempt - command escalation
     cmd_lease_2 = lm.issue_lease("execute_command_ls")
     assert lm.verify_lease(cmd_lease_2, "execute_command_rm") is False
+
+def test_tool_bound_lease():
+    from ephemguard.security.lease_manager import LeaseViolation
+    lm = LeaseManager(b"y" * 32)
+    tok = lm.mint("filesystem_read", "/a.py", "read")
+    with pytest.raises(LeaseViolation):
+        lm.consume(tok, "filesystem_write", {"path": "/a.py", "operation": "write"})
+

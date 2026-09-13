@@ -37,3 +37,6 @@ def test_macos_path_confinement(tmp_path):
     with pytest.raises(PathTraversalError):
         jailer.check_path("/Library/Preferences/com.apple.loginwindow.plist")
 
+def test_macos_safe():
+    validate_command("printf hello")
+

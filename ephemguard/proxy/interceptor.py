@@ -38,19 +38,34 @@ class RateLimitExceeded(Exception):
 
 
 class SecurityInterceptor:
-    def __init__(self, workspace: str, secret: bytes, client_name: str = "Unknown Agent", log_dir: str = None):
+    def __init__(self, workspace: str, secret: bytes, client_name: str = "Unknown Agent", log_dir: str = None, log_path: str = None):
         self.policy = PolicyEngine.for_current_platform()
         self.lease_manager = LeaseManager(secret)
         self.schema_verifier = SchemaVerifier()
         self.intent_guard = IntentGuard()
         self.replay_guard = ReplayGuard()
-        self.audit_logger = AuditLogger(client_name=client_name, log_dir=log_dir)
+        if log_path is not None:
+            self.audit_logger = AuditLogger(path=log_path, client_name=client_name)
+        else:
+            self.audit_logger = AuditLogger(client_name=client_name, log_dir=log_dir)
+        self.audit = self.audit_logger
         self.workspace = workspace
         self.client_name = client_name
 
         # Rate limiting state
         self._request_timestamps: list = []
         self._rate_limit = MAX_REQUESTS_PER_SECOND
+
+    def observe_tools_list(self, server_id: str, response: Dict[str, Any]) -> None:
+        """Pin or verify tool definitions when tools/list is received from upstream."""
+        result = response.get("result")
+        if not isinstance(result, dict) or not isinstance(result.get("tools"), list):
+            return
+        if hasattr(self.schema_verifier, "pin_or_verify"):
+            self.schema_verifier.pin_or_verify(server_id, {"tools": result["tools"]})
+        else:
+            self.schema_verifier.pin_schema(server_id, {"tools": result["tools"]})
+        self.audit_logger.record("ToolSchemaVerified", server_id=server_id, tool_count=len(result["tools"]))
 
     def _check_rate_limit(self) -> None:
         """Enforce per-second rate limiting to prevent abuse."""

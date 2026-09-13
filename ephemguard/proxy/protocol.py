@@ -58,19 +58,16 @@ def parse_jsonrpc(line: str) -> Dict[str, Any]:
     _check_json_depth(obj)
 
     if obj.get("jsonrpc") != "2.0":
-        raise ProtocolError("unsupported JSON-RPC version")
-    if "method" not in obj or not isinstance(obj["method"], str):
-        raise ProtocolError("method is required")
+        raise ProtocolError("invalid JSON-RPC 2.0 object")
+    if "method" in obj:
+        if not isinstance(obj["method"], str):
+            raise ProtocolError("method must be a string")
+    elif "result" not in obj and "error" not in obj:
+        raise ProtocolError("message must contain method, result, or error")
     if "id" in obj and isinstance(obj["id"], (dict, list)):
         raise ProtocolError("id must be scalar or null")
     if "params" in obj and not isinstance(obj["params"], (dict, list)):
         raise ProtocolError("params must be object or array")
-
-    # Validate method is a known MCP method (warn but allow for extensibility)
-    method = obj["method"]
-    if method not in KNOWN_MCP_METHODS and not method.startswith("$/"):
-        # Log unknown methods but don't block — MCP servers may have extensions
-        pass
 
     return obj
 
