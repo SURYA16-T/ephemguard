@@ -31,7 +31,7 @@ def test_windows_command_injection_blocked():
 def test_windows_path_confinement(tmp_path, monkeypatch):
     safe_file = tmp_path / "data.txt"
     safe_file.write_text("safe")
-    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, safe_file).name == "data.txt"
+    assert resolve_confined(tmp_path, safe_file).name == "data.txt"
     
     # UNC paths must be blocked on Windows (on Posix they just resolve safely as relative or absolute without drives)
     if sys.platform == "win32":

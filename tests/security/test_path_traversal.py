@@ -29,7 +29,7 @@ def test_advanced_traversal_payloads(jail_env):
         try:
             # We must convert payload to string if it contains url encoding or raw dots that Path might misinterpret,
             # but PathJailer takes Union[str, Path]
-            resolved = resolve_confined(allowed if 'allowed' in locals() else tmp_path, allowed / str(payload))
+            resolved = resolve_confined(allowed, allowed / str(payload))
             # If it resolves, it MUST be inside allowed root
             assert resolved.is_relative_to(allowed), f"Payload {payload} bypassed jailer!"
         except PathViolation:
@@ -41,7 +41,7 @@ def test_null_byte_injection(jail_env):
     # Null bytes are typically blocked by Python's pathlib, but we should ensure it raises ValueError or PathViolation
     payload = "safe.txt\x00../external/secret.txt"
     try:
-        resolve_confined(allowed if 'allowed' in locals() else tmp_path, allowed / payload)
+        resolve_confined(allowed, allowed / payload)
     except (ValueError, PathViolation):
         pass # Blocked or rejected
 

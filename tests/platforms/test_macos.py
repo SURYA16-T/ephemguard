@@ -31,10 +31,10 @@ def test_macos_command_injection_blocked():
 def test_macos_path_confinement(tmp_path):
     safe_file = tmp_path / "config.plist"
     safe_file.write_text("<plist/>")
-    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, safe_file).name == "config.plist"
+    assert resolve_confined(tmp_path, safe_file).name == "config.plist"
     
     with pytest.raises(PathViolation):
-        resolve_confined(allowed if 'allowed' in locals() else tmp_path, "/Library/Preferences/com.apple.loginwindow.plist")
+        resolve_confined(tmp_path, "/Library/Preferences/com.apple.loginwindow.plist")
 
 def test_macos_safe():
     validate_command("printf hello")

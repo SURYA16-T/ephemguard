@@ -20,11 +20,11 @@ def test_single_use():
 
 def test_confined_relative(tmp_path):
     # check_path raises PathViolation on failure, returns Path on success
-    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, str(tmp_path / "src/a.py")) is not None
+    assert resolve_confined(tmp_path, str(tmp_path / "src/a.py")) is not None
 
 def test_traversal_blocked(tmp_path):
     try:
-        resolve_confined(allowed if 'allowed' in locals() else tmp_path, str(tmp_path / "../secret.txt"))
+        resolve_confined(tmp_path, str(tmp_path / "../secret.txt"))
         assert False
     except PathViolation:
         pass

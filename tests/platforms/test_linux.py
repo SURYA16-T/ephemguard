@@ -32,10 +32,10 @@ def test_linux_command_injection_blocked():
 def test_linux_path_confinement(tmp_path):
     safe_file = tmp_path / "app.log"
     safe_file.write_text("ok")
-    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, safe_file).name == "app.log"
+    assert resolve_confined(tmp_path, safe_file).name == "app.log"
     
     with pytest.raises(PathViolation):
-        resolve_confined(allowed if 'allowed' in locals() else tmp_path, "/etc/passwd")
+        resolve_confined(tmp_path, "/etc/passwd")
 
 def test_linux_safe():
     validate_command("ls -la")
