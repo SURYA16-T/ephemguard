@@ -13,10 +13,10 @@ def main():
     parser = argparse.ArgumentParser(description="EphemGuard: AI Agent Security Gateway")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
-    # Proxy Command
-    proxy_parser = subparsers.add_parser("proxy", help="Run the security proxy")
+    # Proxy / Wrap Command
+    proxy_parser = subparsers.add_parser("proxy", aliases=["wrap"], help="Run the security proxy (alias: wrap)")
     proxy_parser.add_argument("--mode", choices=["auto", "interactive"], default="auto",
-                              help="Operation mode (interactive requires HITL approval)")
+    help="Operation mode (interactive requires HITL approval)")
     proxy_parser.add_argument("--workspace", default=os.getcwd(), help="Allowed workspace path")
     proxy_parser.add_argument("--client-name", default="Unknown Agent", help="Name of the AI client for audit logging")
     proxy_parser.add_argument("--secret-file", help="Path to file for persistent HMAC secret")
@@ -40,7 +40,7 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "proxy":
+    if args.command in ("proxy", "wrap"):
         if not args.upstream:
             print("Error: Upstream command required.", file=sys.stderr)
             sys.exit(1)

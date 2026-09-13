@@ -3,8 +3,13 @@ import json
 import os
 import sys
 import time
-import fcntl
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 from .integrity import chain_hash
 
 
@@ -93,15 +98,15 @@ class AuditLogger:
         # Use file locking for concurrent write safety (cross-platform)
         try:
             with self.path.open("a", encoding="utf-8") as f:
-                if sys.platform != "win32":
+                if fcntl is not None and sys.platform != "win32":
                     fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 try:
                     f.write(serialized)
                 finally:
-                    if sys.platform != "win32":
+                    if fcntl is not None and sys.platform != "win32":
                         fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        except (ImportError, AttributeError):
-            # fcntl not available on Windows — fallback to basic write
+        except (ImportError, AttributeError, OSError):
+            # fcntl not available or locking failed — fallback to basic write
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(serialized)
 
