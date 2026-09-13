@@ -1,5 +1,10 @@
 # EphemGuard
 
+[![CI](https://github.com/SURYA16-T/ephemguard/actions/workflows/ci.yml/badge.svg)](https://github.com/SURYA16-T/ephemguard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
+
 EphemGuard is a cross-platform, user-space security gateway for AI-agent tool calls.
 It applies defense-in-depth controls before a tool request can reach a downstream MCP/JSON-RPC server.
 
