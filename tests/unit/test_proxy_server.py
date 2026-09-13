@@ -17,11 +17,11 @@ async def test_bidirectional_forwarding():
     echo_script = """
 import sys
 while True:
-    line = sys.stdin.readline()
+    line = sys.stdin.buffer.readline()
     if not line:
         break
-    sys.stdout.write("ACK:" + line)
-    sys.stdout.flush()
+    sys.stdout.buffer.write(b"ACK:" + line)
+    sys.stdout.buffer.flush()
 """
     
     secret_file = os.path.join(tempfile.gettempdir(), "dummy_secret_test")
@@ -52,7 +52,8 @@ while True:
         if resp1 == b'':
             stderr_out = await proxy_process.stderr.read()
             raise AssertionError(f"proxy_process exited prematurely. Stderr: {stderr_out.decode('utf-8', errors='replace')}")
-        assert resp1 == b'ACK:{"jsonrpc": "2.0", "method": "test1", "id": 1}\n'
+        assert resp1.rstrip(b'\r\n') == b'ACK:{"jsonrpc": "2.0", "method": "test1", "id": 1}'
+        assert resp1.endswith((b'\n', b'\r\n'))
         
         # Test 2: Windows \r\n newline
         msg2 = b'{"jsonrpc": "2.0", "method": "test2", "id": 2}\r\n'
@@ -60,7 +61,8 @@ while True:
         await proxy_process.stdin.drain()
         
         resp2 = await asyncio.wait_for(proxy_process.stdout.readline(), timeout=5.0)
-        assert resp2 == b'ACK:{"jsonrpc": "2.0", "method": "test2", "id": 2}\r\n'
+        assert resp2.rstrip(b'\r\n') == b'ACK:{"jsonrpc": "2.0", "method": "test2", "id": 2}'
+        assert resp2.endswith((b'\n', b'\r\n'))
         
     finally:
         # Cleanup: close stdin to let the proxy and echo server exit

@@ -86,7 +86,7 @@ class DiagnosticsEngine:
             for k, v in self.commands.items()
         ]
 
-    async def execute_command(self, cmd_id: str, timeout: int = 10) -> CommandResult:
+    async def execute_command(self, cmd_id: str, timeout: int = 20) -> CommandResult:
         """Execute a pre-approved diagnostic command securely."""
         if cmd_id not in self.commands:
             raise ValueError(f"Unknown or unauthorized diagnostic command: {cmd_id}")
