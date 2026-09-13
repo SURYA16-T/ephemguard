@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    min-height: max(884px, 100dvh);
+    background-color: #0f131b; /* surface */
+  }
+}
+
+@layer utilities {
+  .bg-grid-cyber {
+    background-size: 24px 24px;
+    background-image: 
+      linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px);
+  }
+  
+  .corner-tick {
+    position: relative;
+  }
+  .corner-tick::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 6px;
+    height: 6px;
+    border-top: 2px solid #00f0ff;
+    border-left: 2px solid #00f0ff;
+  }
+  .corner-tick::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 6px;
+    height: 6px;
+    border-top: 2px solid #00f0ff;
+    border-right: 2px solid #00f0ff;
+  }
+  
+  .pulse-glow {
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+  }
+}
