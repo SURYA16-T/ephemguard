@@ -9,6 +9,11 @@ description = "Cross-platform security gateway for AI agent tool calls"
 requires-python = ">=3.9"
 dependencies = ["PyYAML>=6.0", "bashlex>=0.18"]
 
+[project.urls]
+Homepage = "https://github.com/SURYA16-T/ephemguard"
+Repository = "https://github.com/SURYA16-T/ephemguard.git"
+Issues = "https://github.com/SURYA16-T/ephemguard/issues"
+
 [project.optional-dependencies]
 test = [
     "pytest>=8.0",
