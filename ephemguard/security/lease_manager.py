@@ -17,16 +17,26 @@ class LeaseManager:
     linked to specific tool names, resources, and operations.
     """
     
-    def __init__(self, secret_key: Optional[bytes] = None, default_ttl: int = 15):
-        self.secret: bytes = secret_key or secrets.token_bytes(32)
+    def __init__(
+        self,
+        secret: Optional[bytes] = None,
+        ttl_seconds: int = 15,
+        *,
+        default_ttl: Optional[int] = None,
+        secret_key: Optional[bytes] = None,
+    ):
+        key = secret if secret is not None else secret_key
+        self.secret: bytes = key or secrets.token_bytes(32)
         self._secret_key: bytes = self.secret
-        self.ttl_seconds: int = default_ttl
-        self.default_ttl: int = default_ttl
+        ttl = default_ttl if default_ttl is not None else ttl_seconds
+        self.ttl_seconds: int = ttl
+        self.default_ttl: int = ttl
         
-        # Store used tokens to prevent replay attacks (token -> expiry time)
+        # Store used tokens to prevent replay attacks
         self._used_tokens: Dict[str, float] = {}
-        self._used: Set[str] = set()
+        self._used: Dict[str, float] = {}
         self._lock = threading.Lock()
+
         
     def _cleanup_expired_tokens(self, current_time: float):
         """Remove tokens that have expired from the used tokens store."""
@@ -103,18 +113,29 @@ class LeaseManager:
         return base64.urlsafe_b64encode(raw).decode() + "." + sig.decode("ascii")
 
     def _decode(self, token: str) -> dict:
-        """Decode and verify the signature of a minted capability lease."""
+        """Decode and verify the signature of a minted capability lease (supports both formats)."""
         try:
-            encoded_raw, sig_hex = token.split(".", 1)
-            raw = base64.urlsafe_b64decode(encoded_raw.encode("ascii"))
-            sig = bytes.fromhex(sig_hex)
-            expected = hmac.new(self.secret, raw, hashlib.sha256).digest()
-            if not hmac.compare_digest(sig, expected):
-                raise LeaseViolation("invalid lease signature")
-            payload = json.loads(raw.decode("utf-8"))
-            if not isinstance(payload, dict) or payload.get("v") != 1:
-                raise LeaseViolation("invalid lease payload")
-            return payload
+            if "." in token:
+                encoded_raw, sig_hex = token.split(".", 1)
+                raw = base64.urlsafe_b64decode(encoded_raw.encode("ascii"))
+                sig = bytes.fromhex(sig_hex)
+                expected = hmac.new(self.secret, raw, hashlib.sha256).digest()
+                if not hmac.compare_digest(sig, expected):
+                    raise LeaseViolation("invalid lease signature")
+                payload = json.loads(raw.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise LeaseViolation("invalid lease payload")
+                return payload
+            else:
+                blob = base64.urlsafe_b64decode(token.encode("ascii"))
+                raw, sig = blob.rsplit(b".", 1)
+                expected = hmac.new(self.secret, raw, hashlib.sha256).digest()
+                if not hmac.compare_digest(sig, expected):
+                    raise LeaseViolation("invalid lease signature")
+                payload = json.loads(raw.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise LeaseViolation("invalid lease payload")
+                return payload
         except LeaseViolation:
             raise
         except (ValueError, json.JSONDecodeError, UnicodeError) as exc:
@@ -124,7 +145,7 @@ class LeaseManager:
         """Consume a lease token for the given tool and arguments, enforcing single-use."""
         if arguments is None:
             arguments = {}
-        if "." in token:
+        try:
             payload = self._decode(token)
             now = int(time.time())
             if int(payload.get("exp", 0)) <= now:
@@ -134,18 +155,23 @@ class LeaseManager:
             requested_resource = str(arguments.get("path", arguments.get("resource", "")))
             if payload.get("resource") and requested_resource != payload["resource"]:
                 raise LeaseViolation("lease resource mismatch")
-            requested_operation = str(arguments.get("operation", "read"))
-            if payload.get("operation") != requested_operation:
-                raise LeaseViolation("lease operation mismatch")
+            if payload.get("operation"):
+                requested_operation = str(arguments.get("operation", "read"))
+                if payload["operation"] != requested_operation:
+                    raise LeaseViolation("lease operation mismatch")
             jti = str(payload.get("jti", ""))
             if not jti:
                 raise LeaseViolation("missing lease identifier")
             with self._lock:
+                self._used = {k: v for k, v in self._used.items() if v > now}
                 if jti in self._used:
                     raise LeaseViolation("lease replay detected")
-                self._used.add(jti)
+                self._used[jti] = int(payload.get("exp", now + self.ttl_seconds))
             return payload
-        else:
+        except LeaseViolation:
+            raise
+        except Exception:
             if not self.verify_lease(token, expected_tool):
                 raise LeaseViolation("capability lease required or invalid")
             return {"tool": expected_tool}
+

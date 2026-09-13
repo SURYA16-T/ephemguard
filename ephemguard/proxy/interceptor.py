@@ -39,6 +39,10 @@ class RateLimitExceeded(Exception):
 
 class SecurityInterceptor:
     def __init__(self, workspace: str, secret: bytes, client_name: str = "Unknown Agent", log_dir: str = None, log_path: str = None):
+        if log_path is None and (client_name.endswith(".jsonl") or "/" in client_name or "\\" in client_name):
+            log_path = client_name
+            client_name = "Unknown Agent"
+        self.workspace = workspace
         self.policy = PolicyEngine.for_current_platform()
         self.lease_manager = LeaseManager(secret)
         self.schema_verifier = SchemaVerifier()
