@@ -51,14 +51,20 @@ class AuditLogger:
         if fcntl:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         elif msvcrt:
+            self._win_lock_pos = f.tell()
+            f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+            f.seek(self._win_lock_pos)
 
     def _unlock_file(self, f):
         """Release cross-process file lock."""
         if fcntl:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
         elif msvcrt:
+            pos = f.tell()
+            f.seek(0)
             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            f.seek(pos)
 
     def record(self, event: str, **fields):
         with self._lock:  # Thread lock
