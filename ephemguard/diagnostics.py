@@ -101,6 +101,7 @@ class DiagnosticsEngine:
                 # Run in PowerShell
                 process = await asyncio.create_subprocess_exec(
                     "powershell", "-NoProfile", "-NonInteractive", "-Command", cmd_str,
+                    stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
@@ -109,6 +110,7 @@ class DiagnosticsEngine:
                 shell = "/bin/bash" if os.path.exists("/bin/bash") else "/bin/sh"
                 process = await asyncio.create_subprocess_exec(
                     shell, "-c", cmd_str,
+                    stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
@@ -130,7 +132,7 @@ class DiagnosticsEngine:
             duration_ms = (time.monotonic() - start_time) * 1000
             if 'process' in locals() and process:
                 try:
-                    process.terminate()
+                    process.kill()
                 except Exception:
                     pass
             return CommandResult(

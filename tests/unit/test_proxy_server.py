@@ -65,11 +65,18 @@ while True:
     finally:
         # Cleanup: close stdin to let the proxy and echo server exit
         if proxy_process.stdin:
-            proxy_process.stdin.close()
             try:
-                await proxy_process.wait()
-            except ProcessLookupError:
+                proxy_process.stdin.close()
+            except Exception:
                 pass
+        try:
+            proxy_process.kill()
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(proxy_process.wait(), timeout=3.0)
+        except Exception:
+            pass
         try:
             if os.path.exists(secret_file):
                 os.remove(secret_file)

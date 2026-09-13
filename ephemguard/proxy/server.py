@@ -106,6 +106,100 @@ class StdioBridge:
         )
         logger.info(f"Started upstream process: {' '.join(self.command)} (PID: {self.process.pid})")
 
+    async def _handle_client_message(self, line: bytes, writer) -> None:
+        """Inspect and forward a single message from client to upstream server."""
+        if len(line) > MAX_MESSAGE_SIZE:
+            logger.warning(f"Message exceeds {MAX_MESSAGE_SIZE} byte limit, dropping")
+            return
+
+        try:
+            line_str = line.decode('utf-8').strip()
+            if not line_str:
+                return
+
+            req = parse_jsonrpc(line_str)
+
+            params = req.get("params", {})
+            lease = None
+            nonce = None
+            if isinstance(params, dict):
+                lease = params.get("_meta", {}).get("lease")
+                nonce = params.get("_meta", {}).get("nonce")
+
+            # Inspect with Security Interceptor
+            result = self.interceptor.inspect(req, lease=lease, nonce=nonce)
+
+            # Interactive Mode Check
+            if self.mode == "interactive" and result.allowed and req.get("method") == "tools/call":
+                req_id = str(uuid.uuid4())
+
+                pending_file = os.path.join(self.pending_dir, f"{req_id}.json")
+                decision_file = os.path.join(self.decisions_dir, f"{req_id}.json")
+
+                pending_data = {
+                    "id": req_id,
+                    "client": self.client_name,
+                    "request": req
+                }
+
+                with open(pending_file, "w") as f:
+                    json.dump(pending_data, f)
+
+                # Wait for decision with timeout (5 minutes max)
+                approved = False
+                timeout = 300  # 5 minutes
+                elapsed = 0
+                while elapsed < timeout:
+                    if os.path.exists(decision_file):
+                        try:
+                            with open(decision_file, "r") as f:
+                                decision_data = json.load(f)
+                                approved = decision_data.get("approved", False)
+                            break
+                        except json.JSONDecodeError:
+                            pass  # File still being written
+                    await asyncio.sleep(0.1)
+                    elapsed += 0.1
+
+                # Cleanup IPC files
+                try:
+                    os.remove(pending_file)
+                except OSError:
+                    pass
+                try:
+                    os.remove(decision_file)
+                except OSError:
+                    pass
+
+                if not approved:
+                    result.allowed = False
+                    result.reason = "Denied by user via Dashboard interactive mode"
+
+            if not result.allowed:
+                error_resp = {
+                    "code": -32001,
+                    "message": f"Security Violation: {result.reason}"
+                }
+                error_line = encode_jsonrpc_response(req.get("id"), error=error_resp)
+                error_bytes = error_line.encode('utf-8') + b'\n'
+
+                sys.stdout.buffer.write(error_bytes)
+                sys.stdout.buffer.flush()
+                return  # Skip forwarding this request
+
+            # If allowed and arguments were transformed
+            if result.transformed_params is not None:
+                req["params"]["arguments"] = result.transformed_params
+                line = (json.dumps(req) + "\n").encode('utf-8')
+
+        except ProtocolError:
+            pass  # Let the server handle JSON-RPC protocol errors
+        except Exception as e:
+            logger.error(f"Interceptor failed: {e}")
+
+        writer.write(line)
+        await writer.drain()
+
     async def _forward_stream(self, reader: asyncio.StreamReader, writer, direction: str):
         """Read lines from reader and write to writer."""
         try:
@@ -114,101 +208,11 @@ class StdioBridge:
                 if not line:
                     break
 
-                # Enforce message size limit to prevent DoS
-                if len(line) > MAX_MESSAGE_SIZE:
-                    logger.warning(f"Message exceeds {MAX_MESSAGE_SIZE} byte limit, dropping")
-                    continue
-
-                # Client -> Server Interception
                 if direction == "client->server":
-                    try:
-                        line_str = line.decode('utf-8').strip()
-                        if not line_str:
-                            continue
-
-                        req = parse_jsonrpc(line_str)
-
-                        params = req.get("params", {})
-                        lease = None
-                        nonce = None
-                        if isinstance(params, dict):
-                            lease = params.get("_meta", {}).get("lease")
-                            nonce = params.get("_meta", {}).get("nonce")
-
-                        # Inspect with Security Interceptor
-                        result = self.interceptor.inspect(req, lease=lease, nonce=nonce)
-
-                        # Interactive Mode Check
-                        if self.mode == "interactive" and result.allowed and req.get("method") == "tools/call":
-                            req_id = str(uuid.uuid4())
-                            # req_id is UUID-generated so guaranteed safe for file paths
-
-                            pending_file = os.path.join(self.pending_dir, f"{req_id}.json")
-                            decision_file = os.path.join(self.decisions_dir, f"{req_id}.json")
-
-                            pending_data = {
-                                "id": req_id,
-                                "client": self.client_name,
-                                "request": req
-                            }
-
-                            with open(pending_file, "w") as f:
-                                json.dump(pending_data, f)
-
-                            # Wait for decision with timeout (5 minutes max)
-                            approved = False
-                            timeout = 300  # 5 minutes
-                            elapsed = 0
-                            while elapsed < timeout:
-                                if os.path.exists(decision_file):
-                                    try:
-                                        with open(decision_file, "r") as f:
-                                            decision_data = json.load(f)
-                                            approved = decision_data.get("approved", False)
-                                        break
-                                    except json.JSONDecodeError:
-                                        pass  # File still being written
-                                await asyncio.sleep(0.1)
-                                elapsed += 0.1
-
-                            # Cleanup IPC files
-                            try:
-                                os.remove(pending_file)
-                            except OSError:
-                                pass
-                            try:
-                                os.remove(decision_file)
-                            except OSError:
-                                pass
-
-                            if not approved:
-                                result.allowed = False
-                                result.reason = "Denied by user via Dashboard interactive mode"
-
-                        if not result.allowed:
-                            error_resp = {
-                                "code": -32001,
-                                "message": f"Security Violation: {result.reason}"
-                            }
-                            error_line = encode_jsonrpc_response(req.get("id"), error=error_resp)
-                            error_bytes = error_line.encode('utf-8') + b'\n'
-
-                            sys.stdout.buffer.write(error_bytes)
-                            sys.stdout.buffer.flush()
-                            continue  # Skip forwarding this request
-
-                        # If allowed and arguments were transformed
-                        if result.transformed_params is not None:
-                            req["params"]["arguments"] = result.transformed_params
-                            line = (json.dumps(req) + "\n").encode('utf-8')
-
-                    except ProtocolError:
-                        pass  # Let the server handle JSON-RPC protocol errors
-                    except Exception as e:
-                        logger.error(f"Interceptor failed: {e}")
-
-                writer.write(line)
-                await writer.drain()
+                    await self._handle_client_message(line, writer)
+                else:
+                    writer.write(line)
+                    await writer.drain()
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -232,13 +236,44 @@ class StdioBridge:
     async def _read_stdin(self, writer):
         """Read from our stdin and forward to the subprocess stdin."""
         loop = asyncio.get_running_loop()
-        reader = asyncio.StreamReader(limit=1024 * 1024 * 10)
-        protocol = asyncio.StreamReaderProtocol(reader)
+        if sys.platform == "win32":
+            # On Windows ProactorEventLoop, connect_read_pipe is not supported.
+            # Read from sys.stdin using a background thread and asyncio queue.
+            queue: asyncio.Queue = asyncio.Queue()
 
-        # Connect sys.stdin to the StreamReader
-        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+            def _reader():
+                try:
+                    while True:
+                        line = sys.stdin.readline()
+                        if not line:
+                            break
+                        loop.call_soon_threadsafe(queue.put_nowait, line)
+                except Exception:
+                    pass
+                finally:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        await self._forward_stream(reader, writer, "client->server")
+            import threading
+            thread = threading.Thread(target=_reader, daemon=True)
+            thread.start()
+
+            try:
+                while True:
+                    line = await queue.get()
+                    if line is None:
+                        break
+                    line_bytes = line.encode('utf-8') if isinstance(line, str) else line
+                    await self._handle_client_message(line_bytes, writer)
+            except asyncio.CancelledError:
+                pass
+            finally:
+                if hasattr(writer, 'close'):
+                    writer.close()
+        else:
+            reader = asyncio.StreamReader(limit=1024 * 1024 * 10)
+            protocol = asyncio.StreamReaderProtocol(reader)
+            await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+            await self._forward_stream(reader, writer, "client->server")
 
     async def _read_stdout(self, reader: asyncio.StreamReader):
         """Read from subprocess stdout and forward to our stdout."""
