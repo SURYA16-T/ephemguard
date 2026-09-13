@@ -1,7 +1,6 @@
 from typing import Dict, Any
 import sys
 
-from ephemguard.security.path_jailer import PathJailer, PathTraversalError
 from ephemguard.security.path_guard import PathViolation, resolve_confined
 from ephemguard.security.command_guard import (
     PosixCommandGuard, WindowsCommandGuard, CommandInjectionError,
@@ -20,7 +19,6 @@ def attenuate_tool_call(tool: str, arguments: Dict[str, Any], workspace: str, po
     and command sanitization.
     """
     attenuated = arguments.copy()
-    jailer = PathJailer([workspace])
     
     for key, value in list(attenuated.items()):
         if isinstance(value, str):
@@ -32,7 +30,7 @@ def attenuate_tool_call(tool: str, arguments: Dict[str, Any], workspace: str, po
                     attenuated[key] = str(out_path)
                 except PathViolation as e:
                     raise CapabilityViolation(f"path violation in '{key}': {e}") from e
-                except (PathTraversalError, ValueError) as e:
+                except ValueError as e:
                     raise CapabilityViolation(f"path violation in '{key}': {e}") from e
             
             # Attenuate command arguments

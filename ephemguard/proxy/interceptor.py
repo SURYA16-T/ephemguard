@@ -11,7 +11,7 @@ from ephemguard.security.schema_verifier import SchemaVerifier, SchemaTamperingE
 from ephemguard.security.semantic_guard import IntentGuard, IntentMismatch
 
 from ephemguard.security.replay_guard import ReplayGuard
-from ephemguard.security.audit import AuditLogger
+from ephemguard.audit.logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 

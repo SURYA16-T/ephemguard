@@ -10,7 +10,6 @@ import signal
 from typing import Optional, List
 
 from ephemguard.security.command_guard import CommandInjectionError
-from ephemguard.security.path_jailer import PathTraversalError
 from ephemguard.security.schema_verifier import SchemaTamperingError
 
 from ephemguard.proxy.protocol import parse_jsonrpc, encode_jsonrpc_response, ProtocolError

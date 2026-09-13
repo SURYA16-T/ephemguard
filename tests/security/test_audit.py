@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from ephemguard.security.audit import AuditLogger
+from ephemguard.audit.logger import AuditLogger
 from ephemguard.security.integrity import verify_chain, chain_hash
 
 def test_audit_logger_valid_chain(tmp_path):

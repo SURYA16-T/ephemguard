@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from ephemguard.security.path_jailer import PathJailer, PathTraversalError
+from ephemguard.security.path_guard import resolve_confined, PathViolation
 
 @pytest.fixture
 def jail_env(tmp_path):
@@ -14,7 +14,6 @@ def jail_env(tmp_path):
 
 def test_advanced_traversal_payloads(jail_env):
     allowed, external = jail_env
-    jailer = PathJailer([allowed])
     
     # Advanced payloads
     payloads = [
@@ -30,21 +29,20 @@ def test_advanced_traversal_payloads(jail_env):
         try:
             # We must convert payload to string if it contains url encoding or raw dots that Path might misinterpret,
             # but PathJailer takes Union[str, Path]
-            resolved = jailer.check_path(allowed / str(payload))
+            resolved = resolve_confined(allowed if 'allowed' in locals() else tmp_path, allowed / str(payload))
             # If it resolves, it MUST be inside allowed root
             assert resolved.is_relative_to(allowed), f"Payload {payload} bypassed jailer!"
-        except PathTraversalError:
+        except PathViolation:
             pass # Blocked successfully
 
 def test_null_byte_injection(jail_env):
     allowed, external = jail_env
-    jailer = PathJailer([allowed])
     
-    # Null bytes are typically blocked by Python's pathlib, but we should ensure it raises ValueError or PathTraversalError
+    # Null bytes are typically blocked by Python's pathlib, but we should ensure it raises ValueError or PathViolation
     payload = "safe.txt\x00../external/secret.txt"
     try:
-        jailer.check_path(allowed / payload)
-    except (ValueError, PathTraversalError):
+        resolve_confined(allowed if 'allowed' in locals() else tmp_path, allowed / payload)
+    except (ValueError, PathViolation):
         pass # Blocked or rejected
 
 def test_path_escape(tmp_path):

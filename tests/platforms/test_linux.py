@@ -1,7 +1,7 @@
 import pytest
 from ephemguard.platform.posix import validate_command
 from ephemguard.security.command_guard.base import CommandInjectionError
-from ephemguard.security.path_jailer import PathJailer, PathTraversalError
+from ephemguard.security.path_guard import resolve_confined, PathViolation
 
 def test_linux_style_policy():
     # Safe commands commonly used on Linux
@@ -30,13 +30,12 @@ def test_linux_command_injection_blocked():
             validate_command(cmd)
 
 def test_linux_path_confinement(tmp_path):
-    jailer = PathJailer([tmp_path])
     safe_file = tmp_path / "app.log"
     safe_file.write_text("ok")
-    assert jailer.check_path(safe_file).name == "app.log"
+    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, safe_file).name == "app.log"
     
-    with pytest.raises(PathTraversalError):
-        jailer.check_path("/etc/passwd")
+    with pytest.raises(PathViolation):
+        resolve_confined(allowed if 'allowed' in locals() else tmp_path, "/etc/passwd")
 
 def test_linux_safe():
     validate_command("ls -la")

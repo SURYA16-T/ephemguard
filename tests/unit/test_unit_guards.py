@@ -1,6 +1,6 @@
 import pytest
 from ephemguard.security.lease_manager import LeaseManager
-from ephemguard.security.path_jailer import PathJailer, PathTraversalError
+from ephemguard.security.path_guard import resolve_confined, PathViolation
 from ephemguard.security.replay_guard import ReplayGuard
 from ephemguard.security.schema_verifier import SchemaVerifier, SchemaTamperingError
 
@@ -19,16 +19,14 @@ def test_single_use():
         pass
 
 def test_confined_relative(tmp_path):
-    jailer = PathJailer([str(tmp_path)])
-    # check_path raises PathTraversalError on failure, returns Path on success
-    assert jailer.check_path(str(tmp_path / "src/a.py")) is not None
+    # check_path raises PathViolation on failure, returns Path on success
+    assert resolve_confined(allowed if 'allowed' in locals() else tmp_path, str(tmp_path / "src/a.py")) is not None
 
 def test_traversal_blocked(tmp_path):
-    jailer = PathJailer([str(tmp_path)])
     try:
-        jailer.check_path(str(tmp_path / "../secret.txt"))
+        resolve_confined(allowed if 'allowed' in locals() else tmp_path, str(tmp_path / "../secret.txt"))
         assert False
-    except PathTraversalError:
+    except PathViolation:
         pass
 
 def test_replay_guard():
