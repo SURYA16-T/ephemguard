@@ -8,7 +8,7 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function Overview({ sysInfo }) {
+function Overview({ sysInfo, requireApproval, onToggleApproval }) {
   if (!sysInfo) {
     return <div className="text-on-surface-variant font-code-md">Loading telemetry...</div>;
   }
@@ -37,6 +37,32 @@ function Overview({ sysInfo }) {
           </div>
         </div>
       </div>
+
+      <section className="bg-surface-container-low border border-outline-variant p-space-md mb-space-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="material-symbols-outlined text-primary-container">admin_panel_settings</span>
+              <h2 className="font-headline-md text-primary tracking-wide uppercase">Access Control</h2>
+            </div>
+            <p className="font-code-sm text-outline">Require manual dashboard approval for intercepted agent actions.</p>
+          </div>
+          <button 
+            onClick={onToggleApproval}
+            className={`flex items-center gap-2 px-4 py-2 border font-label-tactical text-label-tactical uppercase tracking-widest transition-colors ${
+              requireApproval 
+                ? 'bg-primary-container text-on-primary-container border-primary-container shadow-[0_0_10px_rgba(0,162,253,0.3)]' 
+                : 'bg-surface-container text-on-surface-variant border-outline hover:border-primary-container/50'
+            }`}
+          >
+            {requireApproval ? (
+              <><span className="w-2 h-2 rounded-full bg-on-primary-container animate-pulse"></span> HITL ARMED</>
+            ) : (
+              <><span className="w-2 h-2 rounded-full bg-outline"></span> HITL DISARMED</>
+            )}
+          </button>
+        </div>
+      </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
         <article className="bg-surface-container-low border border-outline-variant p-space-md relative overflow-hidden flex flex-col justify-between">

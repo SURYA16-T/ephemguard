@@ -8,6 +8,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [sysInfo, setSysInfo] = useState(null);
   const [pendingReqs, setPendingReqs] = useState([]);
+  const [requireApproval, setRequireApproval] = useState(false);
 
   const fetchSystemInfo = async () => {
     try {
@@ -27,12 +28,26 @@ function App() {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings/approval');
+      if (res.ok) {
+        const data = await res.json();
+        setRequireApproval(data.require_approval);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchSystemInfo();
     fetchPending();
+    fetchSettings();
     const interval = setInterval(() => {
       fetchSystemInfo();
       fetchPending();
+      fetchSettings();
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -45,6 +60,20 @@ function App() {
         body: JSON.stringify({ id, approved })
       });
       fetchPending();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const toggleApprovalSetting = async () => {
+    try {
+      const newValue = !requireApproval;
+      await fetch('/api/settings/approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ require_approval: newValue })
+      });
+      setRequireApproval(newValue);
     } catch (e) {
       console.error(e);
     }
@@ -77,7 +106,7 @@ function App() {
 
       {/* Main Content */}
       <main className="w-full px-space-md py-space-sm space-y-space-md mt-4">
-        {activeTab === 'overview' && <Overview sysInfo={sysInfo} />}
+        {activeTab === 'overview' && <Overview sysInfo={sysInfo} requireApproval={requireApproval} onToggleApproval={toggleApprovalSetting} />}
         {activeTab === 'terminal' && <Terminal sysInfo={sysInfo} />}
         {activeTab === 'approvals' && <Approvals pendingReqs={pendingReqs} onDecide={handleApproveDeny} />}
         {activeTab === 'audit' && <Audit />}

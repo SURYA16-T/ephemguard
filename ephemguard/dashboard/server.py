@@ -23,6 +23,7 @@ class DashboardServer:
         self.pending_dir = os.path.abspath(os.path.join(base_log_dir, "pending"))
         self.decisions_dir = os.path.abspath(os.path.join(base_log_dir, "decisions"))
         self.audit_file = os.path.abspath(os.path.join(base_log_dir, "audit.jsonl"))
+        self.approval_flag_file = os.path.abspath(os.path.join(base_log_dir, "require_approval.flag"))
         
         os.makedirs(self.pending_dir, exist_ok=True)
         os.makedirs(self.decisions_dir, exist_ok=True)
@@ -53,6 +54,24 @@ class DashboardServer:
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;"
         return response
+
+    async def get_approval_setting(self, request):
+        return web.json_response({
+            "require_approval": os.path.exists(self.approval_flag_file)
+        })
+
+    async def post_approval_setting(self, request):
+        try:
+            data = await request.json()
+            require = data.get("require_approval", False)
+            if require:
+                open(self.approval_flag_file, 'a').close()
+            else:
+                if os.path.exists(self.approval_flag_file):
+                    os.remove(self.approval_flag_file)
+            return web.json_response({"status": "ok"})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
 
     async def get_pending(self, request):
         pending = []
@@ -176,6 +195,8 @@ class DashboardServer:
         app.router.add_get("/api/pending", self.get_pending)
         app.router.add_post("/api/decide", self.post_decision)
         app.router.add_get("/api/audit", self.get_audit_log)
+        app.router.add_get("/api/settings/approval", self.get_approval_setting)
+        app.router.add_post("/api/settings/approval", self.post_approval_setting)
         
         # Diagnostic endpoints
         app.router.add_get("/api/system", self.get_system_info)

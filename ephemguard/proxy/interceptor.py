@@ -1,5 +1,7 @@
-"""Security interception pipeline for tool-call requests."""
+import os
 import time
+import json
+import uuid
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional, Dict
@@ -50,11 +52,19 @@ class SecurityInterceptor:
         self.replay_guard = ReplayGuard()
         if log_path is not None:
             self.audit_logger = AuditLogger(path=log_path, client_name=client_name)
+            self.log_dir = os.path.dirname(os.path.abspath(log_path))
         else:
             self.audit_logger = AuditLogger(client_name=client_name, log_dir=log_dir)
+            self.log_dir = log_dir or os.path.join(self.workspace, "logs")
         self.audit = self.audit_logger
         self.workspace = workspace
         self.client_name = client_name
+        self.approval_flag_file = os.path.join(self.log_dir, "require_approval.flag")
+        self.pending_dir = os.path.join(self.log_dir, "pending")
+        self.decisions_dir = os.path.join(self.log_dir, "decisions")
+        
+        os.makedirs(self.pending_dir, exist_ok=True)
+        os.makedirs(self.decisions_dir, exist_ok=True)
 
         # Rate limiting state
         self._request_timestamps: list = []
@@ -132,6 +142,46 @@ class SecurityInterceptor:
             if user_intent:
                 self.intent_guard.check(user_intent, tool, attenuated)
                 checks_performed.append("intent_guard")
+
+            # 6. Human-in-the-loop Approval check
+            if os.path.exists(self.approval_flag_file):
+                checks_performed.append("hitl_approval")
+                req_id = str(uuid.uuid4())
+                pending_file = os.path.join(self.pending_dir, f"{req_id}.json")
+                decision_file = os.path.join(self.decisions_dir, f"{req_id}.json")
+                
+                # Write to pending
+                with open(pending_file, "w") as f:
+                    json.dump({"id": req_id, "client": self.client_name, "request": request}, f)
+                
+                # Wait for decision
+                timeout = 300  # 5 minutes
+                start_wait = time.monotonic()
+                approved = False
+                decision_found = False
+                
+                while time.monotonic() - start_wait < timeout:
+                    if os.path.exists(decision_file):
+                        try:
+                            with open(decision_file, "r") as f:
+                                dec = json.load(f)
+                                approved = dec.get("approved", False)
+                                decision_found = True
+                        except Exception:
+                            pass
+                        break
+                    time.sleep(0.5)
+                
+                # Cleanup
+                if os.path.exists(pending_file):
+                    os.remove(pending_file)
+                if os.path.exists(decision_file):
+                    os.remove(decision_file)
+                
+                if not decision_found:
+                    raise PolicyViolation("human-in-the-loop approval timed out")
+                if not approved:
+                    raise PolicyViolation("denied by human administrator")
 
             duration_ms = (time.monotonic() - start_time) * 1000
             self.audit_logger.record(
