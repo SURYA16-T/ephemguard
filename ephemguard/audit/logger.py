@@ -1,12 +1,31 @@
 """Tamper-evident structured JSONL audit logger."""
-import json, threading, time
+import json
+import os
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Union
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
+
 from .integrity import chain_hash
 
 class AuditLogger:
     def __init__(self, path: str = "logs/audit.jsonl", client_name: str = "Unknown Agent", log_dir: Optional[str] = None):
-        self.path = Path(log_dir) / "audit.jsonl" if log_dir else Path(path)
+        if log_dir:
+            self.path = Path(os.path.abspath(log_dir)) / "audit.jsonl"
+        else:
+            self.path = Path(os.path.abspath(path))
+            
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.client_name = client_name
         self._lock = threading.Lock()
@@ -27,12 +46,35 @@ class AuditLogger:
             return "0" * 64
         return last_hash
 
+    def _lock_file(self, f):
+        """Apply cross-process file lock."""
+        if fcntl:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        elif msvcrt:
+            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+
+    def _unlock_file(self, f):
+        """Release cross-process file lock."""
+        if fcntl:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        elif msvcrt:
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+
     def record(self, event: str, **fields):
-        with self._lock:
+        with self._lock:  # Thread lock
             entry = {"ts": time.time(), "client": self.client_name, "event": event, **fields, "prev_hash": self.prev}
             digest = chain_hash(entry)
             entry["hash"] = digest
+            
+            # Cross-process file lock
             with self.path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n")
+                self._lock_file(f)
+                try:
+                    f.write(json.dumps(entry, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    self._unlock_file(f)
+                    
             self.prev = digest
             return entry
